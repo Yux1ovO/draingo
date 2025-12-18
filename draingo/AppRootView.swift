@@ -7,11 +7,9 @@
 
 import SwiftUI
 
-import SwiftUI
-
 struct AppRootView: View {
     var body: some View {
-        MapScreen()
+        SetLocationScreen()
     }
 }
 
