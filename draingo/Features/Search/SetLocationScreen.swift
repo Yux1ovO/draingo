@@ -2,7 +2,7 @@
 //  SetLocationScreen.swift
 //  draingo
 //
-//  Created by Zhixing Wang on 2025-12-19.
+//  Created by Yuxi Shen on 2025-12-19.
 //
 
 import SwiftUI
@@ -16,12 +16,7 @@ struct SetLocationScreen: View {
         ZStack {
             Map(position: $camera) {
                 // optional: show a marker at center
-                Annotation("", coordinate: vm.region.center) {
-                    Circle()
-                        .fill(Color.blue.opacity(0.25))
-                        .frame(width: 46, height: 46)
-                        .overlay(Circle().stroke(.white.opacity(0.8), lineWidth: 2))
-                }
+                Annotation("", coordinate: vm.region.center) {}
             }
             .onMapCameraChange(frequency: .onEnd) { ctx in
                 vm.onMapRegionChange(ctx.region)
@@ -42,13 +37,16 @@ struct SetLocationScreen: View {
                 FloodSearchCard(
                     query: $vm.query,
                     onPinTap: { vm.useCenterAsLocation() },
-                    onSearch: { vm.searchTapped() }
+                    onSearch: { performSearchAndFocus() }
                 )
                 .padding(.horizontal, 16)
                 .padding(.bottom, 18)
             }
         }
-        .onAppear { vm.onAppear() }
+        .onAppear {
+            vm.onAppear()
+            moveCamera(to: vm.region, animated: false)
+        }
         .alert("Error", isPresented: Binding(
             get: { vm.errorMessage != nil },
             set: { _ in vm.errorMessage = nil }
@@ -56,6 +54,24 @@ struct SetLocationScreen: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(vm.errorMessage ?? "")
+        }
+    }
+
+    private func performSearchAndFocus() {
+        Task {
+            if let newRegion = await vm.searchTapped() {
+                moveCamera(to: newRegion)
+            }
+        }
+    }
+
+    @MainActor
+    private func moveCamera(to region: MKCoordinateRegion, animated: Bool = true) {
+        let position = MapCameraPosition.region(region)
+        if animated {
+            withAnimation(.easeInOut) { camera = position }
+        } else {
+            camera = position
         }
     }
 }

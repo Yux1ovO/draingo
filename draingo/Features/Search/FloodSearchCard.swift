@@ -2,7 +2,7 @@
 //  FloodSearchCard.swift
 //  draingo
 //
-//  Created by Zhixing Wang on 2025-12-19.
+//  Created by Yuxi Shen on 2025-12-19.
 //
 
 import SwiftUI

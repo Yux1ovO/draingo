@@ -38,7 +38,7 @@ final class SetLocationViewModel {
     }
 
     func useCenterAsLocation() {
-        Task {
+        Task { @MainActor in
             let name = await placeSearch.reverseGeocode(
                 lat: region.center.latitude,
                 lng: region.center.longitude
@@ -48,24 +48,25 @@ final class SetLocationViewModel {
         }
     }
 
-    func searchTapped() {
+    @MainActor
+    func searchTapped() async -> MKCoordinateRegion? {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
+        guard !trimmed.isEmpty else { return nil }
 
-        Task {
-            do {
-                let item = try await placeSearch.search(query: trimmed, near: region)
-                guard let item else { return }
+        do {
+            let item = try await placeSearch.search(query: trimmed, near: region)
+            guard let item else { return nil }
 
-                let coord = item.location.coordinate
-                region.center = coord
+            let coord = item.location.coordinate
+            region.center = coord
 
-                let label = item.displayNameForUI() ?? trimmed
-                placeName = label.uppercased()
-                await refreshWeather()
-            } catch {
-                errorMessage = "Search failed. Try a different query."
-            }
+            let label = item.displayNameForUI() ?? trimmed
+            placeName = label.uppercased()
+            Task { await refreshWeather() }
+            return region
+        } catch {
+            errorMessage = "Search failed. Try a different query."
+            return nil
         }
     }
 
