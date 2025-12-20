@@ -146,6 +146,7 @@ struct SetLocationScreen: View {
         }
         .sheet(item: $mapViewModel.selectedNode) { node in
             NodeDetailSheet(node: node)
+                .presentationBackground(.white)
                 .presentationDetents([.medium])
         }
     }
