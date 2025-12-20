@@ -1,4 +1,4 @@
-# draingo — Development Report
+# draingo
 
 ### Overview
 - draingo is an iOS-only app built with SwiftUI to help people understand flood risk around a location.
