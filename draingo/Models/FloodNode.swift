@@ -10,6 +10,7 @@ import CoreLocation
 
 struct FloodNode: Identifiable, Decodable, Equatable {
     let id: String
+    let name: String?
     let lat: Double
     let lng: Double
     let riskLevel: Int
@@ -22,6 +23,7 @@ struct FloodNode: Identifiable, Decodable, Equatable {
 
     private enum CodingKeys: String, CodingKey {
         case id
+        case name
         case lat
         case lng
         case riskLevel = "risk_level"

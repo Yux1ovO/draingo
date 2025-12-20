@@ -9,22 +9,97 @@ import SwiftUI
 
 struct NodeDetailSheet: View {
     let node: FloodNode
+    @State private var viewModel: NodeDetailViewModel
+
+    init(node: FloodNode) {
+        self.node = node
+        _viewModel = State(initialValue: NodeDetailViewModel(node: node))
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Risk \(node.riskLevel)")
-                .font(.title2.bold())
+        ScrollView(showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 18) {
+                header
 
-            if let depth = node.depthCm {
-                Text("Depth: \(depth, specifier: "%.1f") cm")
-                    .font(.body)
+                VStack(alignment: .leading, spacing: 10) {
+                    sectionTitle("Walking Guidance")
+                    NodeDetailGuidanceCard(text: RiskLevelStyle.guidance(for: node.riskLevel))
+                }
+
+                VStack(alignment: .leading, spacing: 10) {
+                    sectionTitle("User Reports")
+                    if viewModel.reports.isEmpty {
+                        NodeDetailReportCard(report: nil)
+                    } else {
+                        ForEach(viewModel.reports) { report in
+                            NodeDetailReportCard(report: report)
+                        }
+                    }
+                }
+
+                NodeDetailAddressCard(address: resolvedAddress)
+
+                if let errorMessage = viewModel.errorMessage {
+                    Text(errorMessage)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
             }
-
-            Text("Updated \(node.updatedAt.formatted(date: .abbreviated, time: .shortened))")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+            .padding(20)
         }
-        .padding()
+        .task {
+            await viewModel.load()
+        }
+    }
+
+    private var header: some View {
+        HStack(alignment: .center, spacing: 12) {
+            RiskLevelBadge(riskLevel: node.riskLevel)
+
+            Text(displayTitle)
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+
+            Spacer(minLength: 8)
+
+            HStack(spacing: 0) {
+                Text("\(RiskLevelStyle.label(for: node.riskLevel)) Risk: ")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Text(depthText)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(RiskLevelStyle.depthColor(for: node.riskLevel))
+            }
+        }
+    }
+
+    private func sectionTitle(_ text: String) -> some View {
+        Text(text)
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(.secondary)
+    }
+
+    private var displayTitle: String {
+        if let name = node.name, !name.isEmpty {
+            return name
+        }
+        if !viewModel.addressLine.isEmpty {
+            return viewModel.addressLine
+        }
+        return "Location"
+    }
+
+    private var resolvedAddress: String {
+        if !viewModel.addressLine.isEmpty {
+            return viewModel.addressLine
+        }
+        return node.name ?? "Location unavailable"
+    }
+
+    private var depthText: String {
+        guard let depth = node.depthCm else { return "--" }
+        return "\(Int(depth.rounded()))cm"
     }
 }
 
@@ -32,6 +107,7 @@ struct NodeDetailSheet: View {
     NodeDetailSheet(
         node: FloodNode(
             id: "preview",
+            name: "Gilmore Place",
             lat: 55.9533,
             lng: -3.1883,
             riskLevel: 5,
