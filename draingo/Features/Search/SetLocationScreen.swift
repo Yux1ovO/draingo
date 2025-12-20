@@ -12,54 +12,101 @@ struct SetLocationScreen: View {
     @State private var vm = SetLocationViewModel()
     @State private var camera: MapCameraPosition = .automatic
     @State private var pendingRegion: MKCoordinateRegion?
-    @State private var mapDestination: MapDestination?
+    @State private var mapViewModel = MapViewModel()
+    @State private var viewState: ViewState = .search
 
-    private struct MapDestination: Identifiable, Hashable {
-        let id = UUID()
-        let region: MKCoordinateRegion
-
-        static func == (lhs: MapDestination, rhs: MapDestination) -> Bool {
-            lhs.id == rhs.id
-        }
-
-        func hash(into hasher: inout Hasher) {
-            hasher.combine(id)
-        }
+    private enum ViewState {
+        case search
+        case results
     }
 
     var body: some View {
         ZStack {
             Map(position: $camera) {
-                // optional: show a marker at center
-                Annotation("", coordinate: vm.region.center) {}
+                if viewState == .results {
+                    ForEach(mapViewModel.nodes) { node in
+                        Annotation("", coordinate: node.coordinate) {
+                            RiskNodeAnnotation(node: node)
+                                .onTapGesture { mapViewModel.selectedNode = node }
+                        }
+                    }
+                }
             }
             .onMapCameraChange(frequency: .onEnd) { ctx in
                 vm.onMapRegionChange(ctx.region)
                 if let pending = pendingRegion, isRegion(ctx.region, closeTo: pending) {
-                    mapDestination = MapDestination(region: pending)
+                    viewState = .results
                     pendingRegion = nil
+                    Task { await mapViewModel.refreshNodes(for: ctx.region) }
+                } else if viewState == .results {
+                    Task { await mapViewModel.refreshNodes(for: ctx.region) }
                 }
             }
             .ignoresSafeArea()
 
+            if viewState == .results {
+                CenterPinOverlay()
+            }
+
             VStack(spacing: 0) {
 
-                WeatherCard(
-                    placeName: vm.placeName,
-                    weather: vm.weather,
-                    isLoading: vm.isLoadingWeather
-                )
-                .padding(.horizontal, 16)
+                if viewState == .search {
+                    WeatherCard(
+                        placeName: vm.placeName,
+                        weather: vm.weather,
+                        isLoading: vm.isLoadingWeather
+                    )
+                    .padding(.horizontal, 16)
 
-                Spacer()
+                    Spacer()
 
-                FloodSearchCard(
-                    query: $vm.query,
-                    onPinTap: { vm.useCenterAsLocation() },
-                    onSearch: { performSearchAndFocus() }
-                )
-                .padding(.horizontal, 16)
-                .padding(.bottom, 18)
+                    FloodSearchCard(
+                        query: $vm.query,
+                        onPinTap: { vm.useCenterAsLocation() },
+                        onSearch: { performSearchAndFocus() }
+                    )
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 18)
+                }
+            }
+
+            if mapViewModel.isLoading && viewState == .results {
+                VStack {
+                    ProgressView()
+                        .progressViewStyle(.circular)
+                        .padding(10)
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+                    Spacer()
+                }
+                .padding(.top, 12)
+            }
+
+            if viewState == .results {
+                VStack {
+                    HStack {
+                        Button {
+                            viewState = .search
+                            mapViewModel.selectedNode = nil
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "chevron.left")
+                                    .font(.caption.weight(.semibold))
+                                Text("Back")
+                                    .font(.subheadline.weight(.semibold))
+                            }
+                            .foregroundStyle(.primary)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(.ultraThinMaterial, in: Capsule())
+                            .shadow(color: .black.opacity(0.12), radius: 8, x: 0, y: 4)
+                        }
+                        .buttonStyle(.plain)
+                        Spacer()
+                    }
+                    Spacer()
+                }
+                .padding(.leading, 16)
+                .padding(.top, 10)
             }
         }
         .onAppear {
@@ -69,21 +116,26 @@ struct SetLocationScreen: View {
         .navigationTitle("Set Location")
         .navigationBarTitleDisplayMode(.inline)
         .alert("Error", isPresented: Binding(
-            get: { vm.errorMessage != nil },
-            set: { _ in vm.errorMessage = nil }
+            get: { vm.errorMessage != nil || mapViewModel.errorMessage != nil },
+            set: { _ in
+                vm.errorMessage = nil
+                mapViewModel.errorMessage = nil
+            }
         )) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text(vm.errorMessage ?? "")
+            Text(vm.errorMessage ?? mapViewModel.errorMessage ?? "")
         }
-        .navigationDestination(item: $mapDestination) { destination in
-            MapScreen(region: destination.region)
+        .sheet(item: $mapViewModel.selectedNode) { node in
+            NodeDetailSheet(node: node)
+                .presentationDetents([.medium])
         }
     }
 
     private func performSearchAndFocus() {
         Task {
             if let newRegion = await vm.searchTapped() {
+                viewState = .search
                 pendingRegion = newRegion
                 moveCamera(to: newRegion)
             }
