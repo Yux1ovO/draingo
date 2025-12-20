@@ -11,6 +11,21 @@ import MapKit
 struct SetLocationScreen: View {
     @State private var vm = SetLocationViewModel()
     @State private var camera: MapCameraPosition = .automatic
+    @State private var pendingRegion: MKCoordinateRegion?
+    @State private var mapDestination: MapDestination?
+
+    private struct MapDestination: Identifiable, Hashable {
+        let id = UUID()
+        let region: MKCoordinateRegion
+
+        static func == (lhs: MapDestination, rhs: MapDestination) -> Bool {
+            lhs.id == rhs.id
+        }
+
+        func hash(into hasher: inout Hasher) {
+            hasher.combine(id)
+        }
+    }
 
     var body: some View {
         ZStack {
@@ -20,6 +35,10 @@ struct SetLocationScreen: View {
             }
             .onMapCameraChange(frequency: .onEnd) { ctx in
                 vm.onMapRegionChange(ctx.region)
+                if let pending = pendingRegion, isRegion(ctx.region, closeTo: pending) {
+                    mapDestination = MapDestination(region: pending)
+                    pendingRegion = nil
+                }
             }
             .ignoresSafeArea()
 
@@ -47,6 +66,8 @@ struct SetLocationScreen: View {
             vm.onAppear()
             moveCamera(to: vm.region, animated: false)
         }
+        .navigationTitle("Set Location")
+        .navigationBarTitleDisplayMode(.inline)
         .alert("Error", isPresented: Binding(
             get: { vm.errorMessage != nil },
             set: { _ in vm.errorMessage = nil }
@@ -55,11 +76,15 @@ struct SetLocationScreen: View {
         } message: {
             Text(vm.errorMessage ?? "")
         }
+        .navigationDestination(item: $mapDestination) { destination in
+            MapScreen(region: destination.region)
+        }
     }
 
     private func performSearchAndFocus() {
         Task {
             if let newRegion = await vm.searchTapped() {
+                pendingRegion = newRegion
                 moveCamera(to: newRegion)
             }
         }
@@ -73,6 +98,12 @@ struct SetLocationScreen: View {
         } else {
             camera = position
         }
+    }
+
+    private func isRegion(_ lhs: MKCoordinateRegion, closeTo rhs: MKCoordinateRegion) -> Bool {
+        let latDelta = abs(lhs.center.latitude - rhs.center.latitude)
+        let lngDelta = abs(lhs.center.longitude - rhs.center.longitude)
+        return latDelta < 0.0005 && lngDelta < 0.0005
     }
 }
 

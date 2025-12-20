@@ -19,4 +19,13 @@ struct FloodNode: Identifiable, Decodable, Equatable {
     var coordinate: CLLocationCoordinate2D {
         .init(latitude: lat, longitude: lng)
     }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case lat
+        case lng
+        case riskLevel = "risk_level"
+        case depthCm = "depth_cm"
+        case updatedAt = "updated_at"
+    }
 }
