@@ -10,6 +10,7 @@ import SwiftUI
 struct NodeDetailSheet: View {
     let node: FloodNode
     @State private var viewModel: NodeDetailViewModel
+    @State private var isReportSheetPresented: Bool = false
 
     init(node: FloodNode) {
         self.node = node
@@ -27,7 +28,15 @@ struct NodeDetailSheet: View {
                 }
 
                 VStack(alignment: .leading, spacing: 10) {
-                    sectionTitle("User Reports")
+                    HStack {
+                        sectionTitle("User Reports")
+                        Spacer()
+                        Button("Write report") {
+                            isReportSheetPresented = true
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(RiskLevelStyle.accent)
+                    }
                     if viewModel.reports.isEmpty {
                         NodeDetailReportCard(report: nil)
                     } else {
@@ -49,6 +58,11 @@ struct NodeDetailSheet: View {
         }
         .task {
             await viewModel.load()
+        }
+        .sheet(isPresented: $isReportSheetPresented) {
+            NodeReportSheet(node: node) {
+                Task { await viewModel.load() }
+            }
         }
     }
 
