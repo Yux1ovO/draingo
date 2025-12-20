@@ -33,11 +33,12 @@ struct SetLocationScreen: View {
                 }
             }
             .onMapCameraChange(frequency: .onEnd) { ctx in
+                mapViewModel.updateRegion(ctx.region)
                 vm.onMapRegionChange(ctx.region)
                 if let pending = pendingRegion, isRegion(ctx.region, closeTo: pending) {
                     viewState = .results
                     pendingRegion = nil
-                    Task { await mapViewModel.refreshNodes(for: ctx.region) }
+                    Task { await mapViewModel.refreshNodes(for: ctx.region, force: true) }
                 } else if viewState == .results {
                     Task { await mapViewModel.refreshNodes(for: ctx.region) }
                 }
@@ -112,6 +113,17 @@ struct SetLocationScreen: View {
         .onAppear {
             vm.onAppear()
             moveCamera(to: vm.region, animated: false)
+            mapViewModel.updateRegion(vm.region)
+        }
+        .onDisappear {
+            mapViewModel.stopAutoRefresh()
+        }
+        .onChange(of: viewState) { _, newValue in
+            if newValue == .results {
+                mapViewModel.startAutoRefresh(interval: 2.5)
+            } else {
+                mapViewModel.stopAutoRefresh()
+            }
         }
         .navigationTitle("Set Location")
         .navigationBarTitleDisplayMode(.inline)
@@ -136,8 +148,14 @@ struct SetLocationScreen: View {
         Task {
             if let newRegion = await vm.searchTapped() {
                 viewState = .search
-                pendingRegion = newRegion
-                moveCamera(to: newRegion)
+                if let currentRegion = mapViewModel.currentRegion, isRegion(currentRegion, closeTo: newRegion) {
+                    pendingRegion = nil
+                    viewState = .results
+                    Task { await mapViewModel.refreshNodes(for: currentRegion, force: true) }
+                } else {
+                    pendingRegion = newRegion
+                    moveCamera(to: newRegion)
+                }
             }
         }
     }

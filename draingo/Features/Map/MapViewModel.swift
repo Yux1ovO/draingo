@@ -15,16 +15,19 @@ final class MapViewModel {
     var selectedNode: FloodNode?
     var isLoading: Bool = false
     var errorMessage: String?
+    var currentRegion: MKCoordinateRegion?
 
     private let nodeService: FloodNodeService
     private var lastBBox: BoundingBox?
+    private var refreshTask: Task<Void, Never>?
 
     init(nodeService: FloodNodeService = FloodNodeService()) {
         self.nodeService = nodeService
     }
 
     @MainActor
-    func refreshNodes(for region: MKCoordinateRegion) async {
+    func refreshNodes(for region: MKCoordinateRegion, force: Bool = false) async {
+        currentRegion = region
         let bbox = BoundingBox(
             minLat: region.center.latitude - region.span.latitudeDelta / 2,
             minLng: region.center.longitude - region.span.longitudeDelta / 2,
@@ -32,7 +35,7 @@ final class MapViewModel {
             maxLng: region.center.longitude + region.span.longitudeDelta / 2
         )
 
-        guard bbox != lastBBox else { return }
+        guard force || bbox != lastBBox else { return }
         lastBBox = bbox
 
         errorMessage = nil
@@ -44,5 +47,33 @@ final class MapViewModel {
         } catch {
             errorMessage = "Failed to load flood nodes."
         }
+    }
+
+    @MainActor
+    func updateRegion(_ region: MKCoordinateRegion) {
+        currentRegion = region
+    }
+
+    @MainActor
+    func startAutoRefresh(interval: TimeInterval) {
+        stopAutoRefresh()
+        refreshTask = Task {
+            while !Task.isCancelled {
+                if let region = currentRegion {
+                    await refreshNodes(for: region, force: true)
+                }
+                try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
+            }
+        }
+    }
+
+    @MainActor
+    func stopAutoRefresh() {
+        refreshTask?.cancel()
+        refreshTask = nil
+    }
+
+    deinit {
+        refreshTask?.cancel()
     }
 }
