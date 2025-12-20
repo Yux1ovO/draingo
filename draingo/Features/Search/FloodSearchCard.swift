@@ -11,6 +11,7 @@ struct FloodSearchCard: View {
     @Binding var query: String
     let onPinTap: () -> Void
     let onSearch: () -> Void
+    let isSearching: Bool
 
     private var actionBlue: Color {
         Color(red: 0.262, green: 0.247, blue: 0.854)
@@ -50,17 +51,25 @@ struct FloodSearchCard: View {
                         )
                 )
                 Button(action: onSearch) {
-                    Text("Search")
-                        .font(.headline.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 50)
+                    HStack(spacing: 8) {
+                        if isSearching {
+                            ProgressView()
+                                .progressViewStyle(.circular)
+                                .tint(.white)
+                        }
+                        Text(isSearching ? "Searching..." : "Search")
+                            .font(.headline.weight(.semibold))
+                            .foregroundStyle(.white)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 50)
                 }
                 .background(
                     RoundedRectangle(cornerRadius: 25, style: .continuous)
                         .fill(actionBlue)
                 )
                 .buttonStyle(.plain)
+                .disabled(isSearching)
             }
             .padding(16)
             .background(
@@ -80,7 +89,8 @@ struct FloodSearchCard: View {
     return FloodSearchCard(
         query: $q,
         onPinTap: { print("Pin tapped") },
-        onSearch: { print("Search tapped: \(q)") }
+        onSearch: { print("Search tapped: \(q)") },
+        isSearching: false
     )
     .padding()
     .background(Color(.systemBackground))

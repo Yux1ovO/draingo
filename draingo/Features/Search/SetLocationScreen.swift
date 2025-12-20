@@ -64,7 +64,8 @@ struct SetLocationScreen: View {
                     FloodSearchCard(
                         query: $vm.query,
                         onPinTap: { vm.useCenterAsLocation() },
-                        onSearch: { performSearchAndFocus() }
+                        onSearch: { performSearchAndFocus() },
+                        isSearching: vm.isSearching
                     )
                     .padding(.horizontal, 16)
                     .padding(.bottom, 18)

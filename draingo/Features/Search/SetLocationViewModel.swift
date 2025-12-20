@@ -15,6 +15,7 @@ final class SetLocationViewModel {
     var placeName: String = "EDINBURGH"
     var weather: WeatherSnapshot?
     var isLoadingWeather: Bool = false
+    var isSearching: Bool = false
     var errorMessage: String?
 
     // Map state
@@ -52,6 +53,9 @@ final class SetLocationViewModel {
     func searchTapped() async -> MKCoordinateRegion? {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
+
+        isSearching = true
+        defer { isSearching = false }
 
         do {
             let item = try await placeSearch.search(query: trimmed, near: region)
