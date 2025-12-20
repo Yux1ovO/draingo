@@ -26,9 +26,30 @@ final class SetLocationViewModel {
 
     private let weatherService = WeatherService()
     private let placeSearch = PlaceSearchService()
+    private let locationService = LocationService()
 
     func onAppear() {
         Task { await refreshWeather() }
+    }
+
+    @MainActor
+    func loadInitialLocation() async -> MKCoordinateRegion? {
+        do {
+            let coord = try await locationService.requestLocation()
+            region.center = coord
+
+            let name = await placeSearch.reverseGeocode(lat: coord.latitude, lng: coord.longitude)
+            if let name { placeName = name.uppercased() }
+
+            Task { await refreshWeather() }
+            return region
+        } catch LocationError.authorizationDenied {
+            errorMessage = "Location access is denied. Enable it in Settings to use nearby search."
+            return nil
+        } catch {
+            errorMessage = "Unable to get your location."
+            return nil
+        }
     }
 
     func onMapRegionChange(_ newRegion: MKCoordinateRegion) {

@@ -115,6 +115,11 @@ struct SetLocationScreen: View {
             vm.onAppear()
             moveCamera(to: vm.region, animated: false)
             mapViewModel.updateRegion(vm.region)
+            Task {
+                if let newRegion = await vm.loadInitialLocation() {
+                    moveCamera(to: newRegion)
+                }
+            }
         }
         .onDisappear {
             mapViewModel.stopAutoRefresh()
